@@ -136,6 +136,16 @@ export const seedTesterDoctor = async () => {
         role: Role.DOCTOR,
         needPasswordChange: false,
         emailVerified: true,
+        doctor: {
+          create: {
+            email,
+            name,
+            experienceYears: 5,
+            licenseNumber: "BMDC000",
+            qualifications: "MBBS",
+            specialization: "Neurology",
+          },
+        },
       },
     });
 

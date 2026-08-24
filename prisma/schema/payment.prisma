@@ -16,8 +16,8 @@ model Payment {
 
   gatewayResponse Json?
 
-  refundTrxId    String?
-  refundAmount   Decimal? @db.Decimal(10, 2)
+  refundTrxId  String?
+  refundAmount Decimal? @db.Decimal(10, 2)
   refundReason String?
   refundTime   String?
 
