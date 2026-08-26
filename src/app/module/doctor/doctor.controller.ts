@@ -3,16 +3,27 @@ import { catchAsync } from "../../utils/catchAsync";
 import { sendResponse } from "../../utils/sendResponse";
 import httpStatus from "http-status";
 import { DoctorService } from "./doctor.service";
+import { applyAsDoctorValidationZodSchema } from "./doctor.validation";
 
 const applyAsDoctor = catchAsync(async (req: Request, res: Response) => {
   const files = req.files as { [fieldname: string]: Express.Multer.File[] };
   const resume = files?.["resume"] ? files["resume"][0] : null;
   const additionalFiles = files?.["additionalFiles"] || [];
 
-  const data = JSON.parse(req.body.data);
-  console.log({ resume, additionalFiles, data });
+  const zodValidationResult = applyAsDoctorValidationZodSchema.safeParse(
+    JSON.parse(req.body.data),
+  );
+  if (!zodValidationResult.success) {
+    throw new Error(
+      "Validation failed: " +
+        JSON.stringify(zodValidationResult.error.format()),
+    );
+  }
+
+  const payload = zodValidationResult.data;
+
   const result = await DoctorService.applyAsDoctor(
-    data,
+    payload,
     resume,
     additionalFiles,
   );
@@ -23,7 +34,31 @@ const applyAsDoctor = catchAsync(async (req: Request, res: Response) => {
     data: result,
   });
 });
+const verifyDoctorEmail = catchAsync(async (req: Request, res: Response) => {
+  const payload = req.body;
+
+  const result = await DoctorService.verifyDoctorEmail(payload);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Doctor email verified Successfully.",
+    data: result,
+  });
+});
+const approveDoctor = catchAsync(async (req: Request, res: Response) => {
+  const payload = req.body;
+
+  const result = await DoctorService.approveDoctor(payload);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Doctor email verified Successfully.",
+    data: result,
+  });
+});
 
 export const DoctorController = {
   applyAsDoctor,
+  verifyDoctorEmail,
+  approveDoctor,
 };
