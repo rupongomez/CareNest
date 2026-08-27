@@ -232,10 +232,41 @@ const approveDoctor = async (
       reviewedAt: new Date(),
     },
   });
+
+  const isApproved = verificationStatus === DoctorVerificationStatus.APPROVED;
+
+  const templatePath = path.join(
+    process.cwd(),
+    `src/app/templates/doctor-application-${isApproved ? "approved" : "rejected"}.ejs`,
+  );
+
+  const templateData = {
+    name: updatedDoctor.name,
+    email: updatedDoctor.email,
+  };
+
+  const html = await ejs.renderFile(templatePath, templateData);
+
+  await transporter.sendMail({
+    from: config.email_sender,
+    to: updatedDoctor.email,
+    subject: `Your Doctor Application has been ${isApproved ? "Approved" : "Rejected"}`,
+    html,
+  });
+
+  return updatedDoctor;
+};
+
+const getAllDoctors = async () => {
+  // search, filter, sorting , pagination
+  const allDoctors = await prisma.doctor.findMany({});
+
+  return allDoctors;
 };
 
 export const DoctorService = {
   applyAsDoctor,
   verifyDoctorEmail,
   approveDoctor,
+  getAllDoctors,
 };
