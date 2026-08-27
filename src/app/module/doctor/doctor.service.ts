@@ -19,6 +19,8 @@ import {
 } from "./doctor.interface";
 import { error } from "console";
 import { RequestUser } from "../../middleware/checkAuth";
+import { IQuery } from "../../interfaces";
+import { DoctorWhereInput } from "../../../generated/prisma/models";
 
 const applyAsDoctor = async (
   payload: IApplyAsDoctorPayload,
@@ -257,11 +259,95 @@ const approveDoctor = async (
   return updatedDoctor;
 };
 
-const getAllDoctors = async () => {
-  // search, filter, sorting , pagination
-  const allDoctors = await prisma.doctor.findMany({});
+const getAllDoctors = async (query: IQuery) => {
+  const limit = query.limit ? Number(query.limit) : 10;
+  const page = query.page ? Number(query.page) : 1;
+  const skip = (page - 1) * limit;
+  const sortBy = query.sortBy ? query.sortBy : "createdAt";
+  const sortOrder = query.sortOrder ? query.sortOrder : "desc";
 
-  return allDoctors;
+  const andConditions: DoctorWhereInput[] = [];
+
+  // Searching
+  if (query.searchTerm) {
+    andConditions.push({
+      OR: [
+        { name: { contains: query.searchTerm, mode: "insensitive" } },
+        { email: { contains: query.searchTerm, mode: "insensitive" } },
+        {
+          specialization: {
+            contains: query.searchTerm,
+            mode: "insensitive",
+          },
+        },
+        { licenseNumber: { contains: query.searchTerm, mode: "insensitive" } },
+      ],
+    });
+  }
+
+  // filtering
+  if (query.specialization) {
+    andConditions.push({
+      specialization: { equals: query.specialization, mode: "insensitive" },
+    });
+  }
+
+  if (query.email) {
+    andConditions.push({
+      email: { equals: query.email, mode: "insensitive" },
+    });
+  }
+
+  if (query.licenseNumber) {
+    andConditions.push({
+      licenseNumber: { equals: query.licenseNumber, mode: "insensitive" },
+    });
+  }
+
+  if (query.verificationStatus) {
+    andConditions.push({
+      verificationStatus: query.verificationStatus as DoctorVerificationStatus,
+    });
+  }
+
+  andConditions.push({ isDeleted: false });
+
+  // search, filter, sorting , pagination
+  const allDoctors = await prisma.doctor.findMany({
+    where: {
+      AND: andConditions.length > 0 ? andConditions : undefined,
+    },
+    take: limit,
+    skip: skip,
+
+    orderBy: {
+      [sortBy]: sortOrder,
+    },
+    include: {
+      user: {
+        omit: {
+          password: true,
+        },
+      },
+      // schedules, appointments, prescriptions ->true
+    },
+  });
+
+  const totalDoctorCount = await prisma.doctor.count({
+    where: {
+      AND: andConditions,
+    },
+  });
+
+  return {
+    data: allDoctors,
+    meta: {
+      page: page,
+      limit: limit,
+      total: totalDoctorCount,
+      totalPages: Math.ceil(totalDoctorCount / limit),
+    },
+  };
 };
 
 export const DoctorService = {

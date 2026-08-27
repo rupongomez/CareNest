@@ -58,12 +58,13 @@ const approveDoctor = catchAsync(async (req: Request, res: Response) => {
   });
 });
 const getAllDoctors = catchAsync(async (req: Request, res: Response) => {
-  const result = await DoctorService.getAllDoctors();
+  const { data, meta } = await DoctorService.getAllDoctors(req.query);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: "Doctors retrieved Successfully.",
-    data: result,
+    data: data,
+    meta: meta,
   });
 });
 
