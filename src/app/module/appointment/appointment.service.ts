@@ -6,18 +6,121 @@ import { prisma } from "../../lib/prisma";
 import {
   AppointmentStatus,
   PaymentStatus,
+  ScheduleStatus,
 } from "../../../generated/prisma/enums";
 import type { RequestUser } from "../../middleware/checkAuth";
 import httpStatus from "http-status";
 import { AppError } from "../../utils/AppError";
+import { IBookAppointmentPayload } from "./appointment.interface";
+import { isAfter, isBefore, isSameDay } from "date-fns";
 
-const bookAppointmentIntoDb = async (payload: any, user: RequestUser) => {
+const bookAppointmentIntoDb = async (
+  payload: IBookAppointmentPayload,
+  user: RequestUser,
+) => {
   const transactionResult = await prisma.$transaction(async (tx) => {
     // business logic
+
+    const patient = await prisma.patient.findUnique({
+      where: { userId: user.userId },
+    });
+
+    if (!patient) {
+      throw new AppError(httpStatus.NOT_FOUND, "Patient profile not found");
+    }
+
+    const schedule = await prisma.schedule.findUnique({
+      where: { id: payload.scheduleId },
+      include: { doctor: true },
+    });
+
+    if (!schedule || schedule.isDeleted) {
+      throw new AppError(httpStatus.NOT_FOUND, "Schedule not found");
+    }
+
+    if (schedule.status !== ScheduleStatus.PUBLISHED) {
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        "This Schedule is not published yet",
+      );
+    }
+
+    const now = new Date();
+    if (!isSameDay(now, schedule.startDateTime)) {
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        "This schedule is not available today",
+      );
+    }
+
+    if (!isBefore(now, schedule.startDateTime)) {
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        "This schedule has already Started",
+      );
+    }
+    if (isAfter(now, schedule.startDateTime)) {
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        "This schedule has already Started",
+      );
+    }
+
+    const existingAppointment = await prisma.appointment.findFirst({
+      where: {
+        patientId: patient.id,
+        scheduleId: schedule.id,
+        // status: { not: AppointmentStatus.CANCELLED },
+      },
+    });
+
+    if (existingAppointment?.status === AppointmentStatus.PENDING) {
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        "You already have a pending appointment. Please complete payment to continue",
+      );
+    }
+    if (existingAppointment?.status === AppointmentStatus.ONGOING) {
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        "You already have a Ongoing appointment.",
+      );
+    }
+    if (existingAppointment?.status === AppointmentStatus.COMPLETED) {
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        "Your appointment for this schedule already completed",
+      );
+    }
+    if (existingAppointment?.status === AppointmentStatus.CONFIRMED) {
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        "You already have a confirmed appointment ",
+      );
+    }
+
+    if (schedule.availableSlots === 0) {
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        "This schedule is fully booked",
+      );
+    }
+
+    if (!schedule.doctor.consultationFee) {
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        "Doctor has not set a consultation fee yet",
+      );
+    }
+
+    const ammount = schedule.doctor.consultationFee;
 
     const appointment = await tx.appointment.create({
       data: {
         status: AppointmentStatus.PENDING,
+        patientId: patient.id,
+        doctorId: schedule.doctor.id,
+        scheduleId: schedule.id,
       },
     });
 
