@@ -1,4 +1,4 @@
-import { UploadApiResponse } from "cloudinary";
+import type { UploadApiResponse } from "cloudinary";
 import { prisma } from "../../lib/prisma";
 import { cloudinaryUpload } from "../../lib/cloudinary";
 import bcrypt from "bcryptjs";
@@ -12,15 +12,17 @@ import path from "path";
 import { transporter } from "../../lib/nodemailer";
 import config from "../../config";
 import ejs from "ejs";
-import {
+import type {
   IApplyAsDoctorPayload,
   IApproveDoctorPayload,
   IVerifyDoctorEmailPayload,
 } from "./doctor.interface";
 import { error } from "console";
-import { RequestUser } from "../../middleware/checkAuth";
-import { IQuery } from "../../interfaces";
-import { DoctorWhereInput } from "../../../generated/prisma/models";
+import type { RequestUser } from "../../middleware/checkAuth";
+import type { IQuery } from "../../interfaces";
+import type { DoctorWhereInput } from "../../../generated/prisma/models";
+import httpStatus from "http-status";
+import { AppError } from "../../utils/AppError";
 
 const applyAsDoctor = async (
   payload: IApplyAsDoctorPayload,
@@ -34,7 +36,10 @@ const applyAsDoctor = async (
   });
 
   if (isUserExist) {
-    throw new Error("User with this email already exists");
+    throw new AppError(
+      httpStatus.CONFLICT,
+      "User with this email already exists",
+    );
   }
 
   const resumeUploadResult = await new Promise<UploadApiResponse>(
@@ -49,7 +54,9 @@ const applyAsDoctor = async (
               return reject(error);
             }
             if (!result) {
-              return reject(new Error("Something went wrong!"));
+              return reject(
+                new AppError(httpStatus.BAD_GATEWAY, "Something went wrong!"),
+              );
             }
             resolve(result);
             // return result;
@@ -72,7 +79,9 @@ const applyAsDoctor = async (
                 return reject(error);
               }
               if (!result) {
-                return reject(new Error("Something went wrong!"));
+                return reject(
+                  new AppError(httpStatus.BAD_GATEWAY, "Something went wrong!"),
+                );
               }
               resolve(result);
               // return result;
@@ -157,20 +166,29 @@ const verifyDoctorEmail = async (payload: IVerifyDoctorEmailPayload) => {
   });
 
   if (!existingUser) {
-    throw new Error("Doctor Application not found. please apply again");
+    throw new AppError(
+      httpStatus.NOT_FOUND,
+      "Doctor Application not found. please apply again",
+    );
   }
 
   if (existingUser.emailVerified) {
-    throw new Error("Email Already verified");
+    throw new AppError(httpStatus.CONFLICT, "Email Already verified");
   }
 
   const otpKey = `doctor-application-otp:${email}`;
   const redisOtp = await redisClient.get(otpKey);
   if (!redisOtp) {
-    throw new Error("OTP expired. please apply again");
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      "OTP expired. please apply again",
+    );
   }
   if (redisOtp !== otp) {
-    throw new Error("Invalid OTP. please apply again");
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      "Invalid OTP. please apply again",
+    );
   }
 
   await redisClient.del(otpKey);
@@ -196,21 +214,23 @@ const approveDoctor = async (
   });
 
   if (!existingDoctor) {
-    throw new Error("Doctor Application not found");
+    throw new AppError(httpStatus.NOT_FOUND, "Doctor Application not found");
   }
 
   if (existingDoctor.isDeleted) {
-    throw new Error("Doctor application has been deleted");
+    throw new AppError(httpStatus.GONE, "Doctor application has been deleted");
   }
 
   if (!existingDoctor.user.emailVerified) {
-    throw new Error(
+    throw new AppError(
+      httpStatus.FORBIDDEN,
       "Doctor has not verified their email yet. Application cannot be reviewed",
     );
   }
 
   if (existingDoctor.verificationStatus !== DoctorVerificationStatus.PENDING) {
-    throw new Error(
+    throw new AppError(
+      httpStatus.CONFLICT,
       `Doctor application has already been ${existingDoctor.verificationStatus.toLowerCase()}`,
     );
   }
@@ -219,7 +239,7 @@ const approveDoctor = async (
     verificationStatus === DoctorVerificationStatus.REJECTED &&
     !rejectionReason
   ) {
-    throw new Error("Rejection reason is required");
+    throw new AppError(httpStatus.BAD_REQUEST, "Rejection reason is required");
   }
 
   const updatedDoctor = await prisma.doctor.update({

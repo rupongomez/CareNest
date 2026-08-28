@@ -1,10 +1,10 @@
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express, {
-  type NextFunction,
-  type Application,
-  type Request,
-  type Response,
+	type NextFunction,
+	type Application,
+	type Request,
+	type Response,
 } from "express";
 import httpStatus from "http-status";
 import config from "./app/config";
@@ -22,10 +22,10 @@ import { DoctorRoutes } from "./app/module/doctor/doctor.route";
 const app: Application = express();
 
 app.use(
-  cors({
-    origin: config.frontend_url,
-    credentials: true,
-  }),
+	cors({
+		origin: config.frontend_url,
+		credentials: true,
+	}),
 );
 
 // Enable URL-encoded form data parsing
@@ -41,26 +41,26 @@ app.use("/api/v1/appointment", AppointmentRoutes);
 app.use("/api/v1/doctor", DoctorRoutes);
 
 app.get("/test", async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const grantIdTokenResult = await getBkashIdToken();
-    console.log(grantIdTokenResult);
+	try {
+		const grantIdTokenResult = await getBkashIdToken();
+		console.log(grantIdTokenResult);
 
-    res.status(httpStatus.OK).json({
-      success: true,
-      message: "Welcome to PH Healthcare System Backend",
-      data: null,
-    });
-  } catch (error) {
-    console.log(error);
-    next(error);
-  }
+		res.status(httpStatus.OK).json({
+			success: true,
+			message: "Welcome to PH Healthcare System Backend",
+			data: null,
+		});
+	} catch (error) {
+		console.log(error);
+		next(error);
+	}
 });
 // Basic route
 app.get("/", async (req: Request, res: Response) => {
-  res.status(httpStatus.OK).json({
-    success: true,
-    message: "Welcome to PH Healthcare System Backend",
-  });
+	res.status(httpStatus.OK).json({
+		success: true,
+		message: "Welcome to PH Healthcare System Backend",
+	});
 });
 
 app.use(globalErrorHandler);

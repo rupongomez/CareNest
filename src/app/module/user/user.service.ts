@@ -2,6 +2,8 @@ import type { UploadApiResponse } from "cloudinary";
 import { cloudinaryUpload } from "../../lib/cloudinary";
 import { prisma } from "../../lib/prisma";
 import { tr } from "zod/locales";
+import httpStatus from "http-status";
+import { AppError } from "../../utils/AppError";
 
 const uploadProfileImageIntoDb = async (buffer: Buffer, userId: string) => {
   // const cloudinaryResult = cloudinaryUpload.uploader
@@ -48,7 +50,9 @@ const uploadProfileImageIntoDb = async (buffer: Buffer, userId: string) => {
               return reject(error);
             }
             if (!result) {
-              return reject(new Error("Something went wrong!"));
+              return reject(
+                new AppError(httpStatus.BAD_GATEWAY, "Something went wrong!"),
+              );
             }
             resolve(result);
             // return result;

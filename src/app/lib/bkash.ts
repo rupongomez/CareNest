@@ -1,5 +1,7 @@
 import config from "../config";
 import { redisClient } from "./redis";
+import httpStatus from "http-status";
+import { AppError } from "../utils/AppError";
 
 export const getBkashIdToken = async () => {
   try {
@@ -39,7 +41,10 @@ export const getBkashIdToken = async () => {
       );
 
       if (!refreshTokenResponse.ok) {
-        throw new Error("Bkash access Token Grant failed");
+        throw new AppError(
+          httpStatus.BAD_GATEWAY,
+          "Bkash access Token Grant failed",
+        );
       }
       const bkashRefreshTokenResult = await refreshTokenResponse.json();
       bkashIdToken = bkashRefreshTokenResult.id_token as string;
@@ -73,7 +78,10 @@ export const getBkashIdToken = async () => {
       },
     );
     if (!response.ok) {
-      throw new Error("Bkash access Token Grant failed");
+      throw new AppError(
+        httpStatus.BAD_GATEWAY,
+        "Bkash access Token Grant failed",
+      );
     }
     const result = await response.json();
     // bkash id token set
@@ -94,7 +102,13 @@ export const getBkashIdToken = async () => {
     bkashIdToken = result.id_token;
 
     return bkashIdToken;
-  } catch (error: any) {
-    throw new Error(error.message);
+  } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+    throw new AppError(
+      httpStatus.BAD_GATEWAY,
+      error instanceof Error ? error.message : "Bkash service failed",
+    );
   }
 };

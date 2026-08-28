@@ -1,9 +1,10 @@
-import { Request, Response } from "express";
+import type { Request, Response } from "express";
 import { catchAsync } from "../../utils/catchAsync";
 import { sendResponse } from "../../utils/sendResponse";
 import httpStatus from "http-status";
 import { DoctorService } from "./doctor.service";
 import { applyAsDoctorValidationZodSchema } from "./doctor.validation";
+import { AppError } from "../../utils/AppError";
 
 const applyAsDoctor = catchAsync(async (req: Request, res: Response) => {
   const files = req.files as { [fieldname: string]: Express.Multer.File[] };
@@ -14,7 +15,8 @@ const applyAsDoctor = catchAsync(async (req: Request, res: Response) => {
     JSON.parse(req.body.data),
   );
   if (!zodValidationResult.success) {
-    throw new Error(
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
       "Validation failed: " +
         JSON.stringify(zodValidationResult.error.format()),
     );
