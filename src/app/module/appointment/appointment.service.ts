@@ -12,7 +12,11 @@ import type { RequestUser } from "../../middleware/checkAuth";
 import httpStatus from "http-status";
 import { AppError } from "../../utils/AppError";
 import { IBookAppointmentPayload } from "./appointment.interface";
-import { isAfter, isBefore, isSameDay } from "date-fns";
+import { addMinutes, isAfter, isBefore, isSameDay } from "date-fns";
+import { transporter } from "../../lib/nodemailer";
+import path from "path";
+import ejs from "ejs";
+import PDFDocument from "pdfkit";
 
 const bookAppointmentIntoDb = async (
   payload: IBookAppointmentPayload,
@@ -113,7 +117,7 @@ const bookAppointmentIntoDb = async (
       );
     }
 
-    const ammount = schedule.doctor.consultationFee;
+    const amount = schedule.doctor.consultationFee.toString();
 
     const appointment = await tx.appointment.create({
       data: {
@@ -147,7 +151,7 @@ const bookAppointmentIntoDb = async (
           payerReference: user.email, // User email or phone number
           callbackURL: `${config.bkash_callback_url}/appointment/book-appointment/payment/callback`,
           // merchantAssociationInfo: "MI05MID54RF09123456One",
-          amount: "1200",
+          amount: amount,
           currency: "BDT",
           intent: "sale",
           // merchantInvoiceNumber: "Inv", //appointment id
@@ -162,7 +166,7 @@ const bookAppointmentIntoDb = async (
       data: {
         merchantInvoiceNumber: bkashCreatePaymentResult.merchantInvoiceNumber,
         appointmentId: appointment.id,
-        amount: "1200",
+        amount: amount,
         gatewayResponse: bkashCreatePaymentResult,
         bkashPaymentId: bkashCreatePaymentResult.paymentID,
         payerReference: user.email,
@@ -184,6 +188,13 @@ const payAppointmentIntoDb = async (payload: any, user: RequestUser) => {
     where: {
       id: appointmentId,
     },
+    include: {
+      schedule: {
+        include: {
+          doctor: true,
+        },
+      },
+    },
   });
 
   if (!existingAppointment) {
@@ -203,7 +214,17 @@ const payAppointmentIntoDb = async (payload: any, user: RequestUser) => {
   //   throw new Error(`Appointment is already ${appointmentStatus}`);
   // }
 
+  if (!existingAppointment.schedule.doctor.consultationFee) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      "Doctor has not set a consultation fee yet",
+    );
+  }
+
+  const amount =
+    existingAppointment.schedule.doctor.consultationFee?.toString();
   const bkashIdToken = await getBkashIdToken();
+
   if (!bkashIdToken) {
     throw new AppError(httpStatus.BAD_GATEWAY, "Bkash id token not found");
   }
@@ -225,7 +246,7 @@ const payAppointmentIntoDb = async (payload: any, user: RequestUser) => {
         payerReference: user.email, // User email or phone number
         callbackURL: `${config.bkash_callback_url}/appointment/book-appointment/payment/callback`,
         // merchantAssociationInfo: "MI05MID54RF09123456One",
-        amount: "1200",
+        amount: amount,
         currency: "BDT",
         intent: "sale",
         // merchantInvoiceNumber: "Inv", //appointment id
@@ -294,14 +315,63 @@ const bookAppointmentCallback = async (query: Record<string, any>) => {
       const executedPaymentResult = await executedPaymentResponse.json();
 
       if (status === "success") {
+        const appointment = await prisma.appointment.findUnique({
+          where: {
+            id: executedPaymentResult.merchantInvoiceNumber,
+          },
+          include: {
+            schedule: true,
+            patient: true,
+            doctor: true,
+          },
+        });
+
+        if (!appointment) {
+          throw new AppError(httpStatus.NOT_FOUND, "Appointment Found");
+        }
+
+        //total slot = 3, available slot = 3
+        // (total-available) + 1
+        const alreadyBookedSlots =
+          appointment.schedule.totalSlots - appointment.schedule.availableSlots;
+        const serialNumber = alreadyBookedSlots + 1;
+        // 25 August => 3:00 PM - 4:00 PM
+        //1st person Joining time => startDateTime = 2026-08-25T15:00:00.148Z => 25 August 3:00 PM
+        // serial number (1) - 1 * 20 => 0 minutes
+
+        //2nd person Joining time => startDateTime = 2026-08-25T15:20:00.148Z => 25 August 3:20 PM
+        // serial number (2) - 1 * 20 => 20 minutes
+
+        //3rd person Joining time => startDateTime = 2026-08-25T15:40:00.148Z => 25 August 3:40 PM
+        // serial number (3) - 1 * 20 => 40 minutes
+
+        const joiningTime = addMinutes(
+          appointment.schedule.startDateTime,
+          (serialNumber - 1) * 20,
+        );
+
         await tx.appointment.update({
           where: {
             id: executedPaymentResult.merchantInvoiceNumber,
           },
           data: {
             status: AppointmentStatus.CONFIRMED,
+            joiningTime,
+            serialNumber,
           },
         });
+
+        const newAvailableSlots = appointment.schedule.availableSlots - 1;
+
+        await tx.schedule.update({
+          where: {
+            id: appointment.schedule.id,
+          },
+          data: {
+            availableSlots: newAvailableSlots,
+          },
+        });
+
         await tx.payment.update({
           where: {
             appointmentId: executedPaymentResult.merchantInvoiceNumber,
@@ -314,6 +384,84 @@ const bookAppointmentCallback = async (query: Record<string, any>) => {
             gatewayResponse: executedPaymentResult,
           },
         });
+
+        const pdfDocument = new PDFDocument({
+          margin: 50,
+        });
+
+        const pdfChunks: Buffer[] = [];
+
+        pdfDocument.on("data", (chunk: Buffer) => {
+          pdfChunks.push(chunk);
+        });
+
+        const pdfReadyPromise = new Promise<Buffer>((resolve) => {
+          pdfDocument.on("end", () => {
+            resolve(Buffer.concat(pdfChunks));
+          });
+        });
+
+        pdfDocument
+          .fontSize(20)
+          .text("CareNest Healthcare System", { align: "center" });
+        pdfDocument
+          .fontSize(14)
+          .text("Appointment Invoice", { align: "center" });
+        pdfDocument.moveDown(2);
+
+        pdfDocument
+          .fontSize(12)
+          .text(`Patient Name:${appointment.patient.name}`);
+        pdfDocument.text(`Patient Email: ${appointment.patient.email}`);
+        pdfDocument.moveDown();
+
+        pdfDocument.text(`Doctor Name:${appointment.doctor.name}`);
+        pdfDocument.text(
+          `Specialization: ${appointment.doctor.specialization}`,
+        );
+        pdfDocument.moveDown();
+
+        pdfDocument.text(
+          `Appointment Date: ${appointment.schedule.startDateTime.toDateString()}`,
+        );
+        pdfDocument.text(`Your Joining Time:${joiningTime.toString()}`);
+        pdfDocument.text(`Your Serial Number: ${serialNumber}`);
+        pdfDocument.text(`Meeting Link:${appointment.schedule.meetingLink}`);
+        pdfDocument.moveDown();
+
+        pdfDocument.text(`Amount Paid: ${executedPaymentResult.amount} BDT`);
+        pdfDocument.text(`Payment Method: bkash`);
+        pdfDocument.text(`Transaction Id: ${executedPaymentResult.trxID}`);
+        pdfDocument.text(
+          `Paid At: ${executedPaymentResult.paymentExecuteTime}`,
+        );
+
+        pdfDocument.end();
+
+        const pdfBuffer = await pdfReadyPromise;
+
+        const templatePath = path.join(
+          process.cwd(),
+          "src/app/templates/registration-user-otp.ejs",
+        );
+        const templateData = {
+          name: name,
+        };
+        const html = await ejs.renderFile(templatePath, templateData);
+
+        await transporter.sendMail({
+          from: config.email_sender,
+          to: appointment.patient.email,
+          subject: "Your Appointment Invoice - CareNest Healthcare System",
+          html,
+          attachments: [
+            {
+              filename: "invoice.pdf",
+              content: pdfBuffer,
+            },
+          ],
+        });
+
         return {
           redirectUrl: `${config.frontend_url}/dashboard/my-appointments?status=success`,
         };
