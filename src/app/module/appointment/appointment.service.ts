@@ -453,7 +453,7 @@ const bookAppointmentCallback = async (query: Record<string, any>) => {
 
         const templatePath = path.join(
           process.cwd(),
-          "src/app/templates/registration-user-otp.ejs",
+          "src/app/templates/booking-confirmed.ejs",
         );
         const templateData = {
           name: name,
