@@ -205,6 +205,8 @@ const getDoctorAnalytics = async (user: RequestUser) => {
     ongoingAppointments,
     completedAppointments,
     cancelledAppointments,
+    totalDoctorEarnings,
+    totalDoctorRefunded,
   };
 };
 
