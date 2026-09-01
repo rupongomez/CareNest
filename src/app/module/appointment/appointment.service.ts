@@ -413,39 +413,216 @@ const bookAppointmentCallback = async (query: Record<string, any>) => {
         });
 
         pdfDocument
-          .fontSize(20)
-          .text("CareNest Healthcare System", { align: "center" });
+          .font("Helvetica-Bold")
+          .fontSize(24)
+          .fillColor("#0f766e")
+          .text("CareNest", { align: "center" });
+
         pdfDocument
-          .fontSize(14)
+          .font("Helvetica")
+          .fontSize(10)
+          .fillColor("#6b7280")
+          .text("Online Medical Management System", { align: "center" });
+
+        pdfDocument.moveDown(0.8);
+
+        pdfDocument
+          .moveTo(50, pdfDocument.y)
+          .lineTo(545, pdfDocument.y)
+          .strokeColor("#e5e7eb")
+          .lineWidth(1)
+          .stroke();
+
+        pdfDocument.moveDown(1.2);
+
+        // Invoice title
+        pdfDocument
+          .font("Helvetica-Bold")
+          .fontSize(20)
+          .fillColor("#111827")
           .text("Appointment Invoice", { align: "center" });
+
+        pdfDocument
+          .font("Helvetica")
+          .fontSize(10)
+          .fillColor("#6b7280")
+          .text("Payment confirmation and appointment details", {
+            align: "center",
+          });
+
         pdfDocument.moveDown(2);
 
+        // Patient & Doctor Section
+        const sectionStartY = pdfDocument.y;
+
         pdfDocument
+          .font("Helvetica-Bold")
           .fontSize(12)
-          .text(`Patient Name:${appointment.patient.name}`);
-        pdfDocument.text(`Patient Email: ${appointment.patient.email}`);
-        pdfDocument.moveDown();
+          .fillColor("#0f766e")
+          .text("PATIENT INFORMATION", 50, sectionStartY);
 
-        pdfDocument.text(`Doctor Name:${appointment.doctor.name}`);
-        pdfDocument.text(
-          `Specialization: ${appointment.doctor.specialization}`,
-        );
-        pdfDocument.moveDown();
+        pdfDocument
+          .font("Helvetica")
+          .fontSize(10)
+          .fillColor("#374151")
+          .text(`Name: ${appointment.patient.name}`, 50, sectionStartY + 22)
+          .text(`Email: ${appointment.patient.email}`, 50, sectionStartY + 39);
+
+        pdfDocument
+          .font("Helvetica-Bold")
+          .fontSize(12)
+          .fillColor("#0f766e")
+          .text("DOCTOR INFORMATION", 310, sectionStartY);
+
+        pdfDocument
+          .font("Helvetica")
+          .fontSize(10)
+          .fillColor("#374151")
+          .text(`Name: ${appointment.doctor.name}`, 310, sectionStartY + 22)
+          .text(
+            `Specialization: ${appointment.doctor.specialization}`,
+            310,
+            sectionStartY + 39,
+          );
+
+        pdfDocument.y = sectionStartY + 75;
+
+        // Divider
+        pdfDocument
+          .moveTo(50, pdfDocument.y)
+          .lineTo(545, pdfDocument.y)
+          .strokeColor("#e5e7eb")
+          .lineWidth(1)
+          .stroke();
+
+        pdfDocument.moveDown(1.3);
+
+        // Appointment Details
+        pdfDocument
+          .font("Helvetica-Bold")
+          .fontSize(12)
+          .fillColor("#0f766e")
+          .text("APPOINTMENT DETAILS");
+
+        pdfDocument.moveDown(0.7);
+
+        const appointmentDetailsY = pdfDocument.y;
+
+        pdfDocument
+          .font("Helvetica")
+          .fontSize(10)
+          .fillColor("#374151")
+          .text(
+            `Appointment Date: ${appointment.schedule.startDateTime.toDateString()}`,
+            50,
+            appointmentDetailsY,
+          )
+          .text(
+            `Joining Time: ${joiningTime.toLocaleString()}`,
+            50,
+            appointmentDetailsY + 20,
+          )
+          .text(`Serial Number: ${serialNumber}`, 50, appointmentDetailsY + 40);
 
         pdfDocument.text(
-          `Appointment Date: ${appointment.schedule.startDateTime.toDateString()}`,
+          `Meeting Link: ${appointment.schedule.meetingLink}`,
+          310,
+          appointmentDetailsY,
         );
-        pdfDocument.text(`Your Joining Time:${joiningTime.toString()}`);
-        pdfDocument.text(`Your Serial Number: ${serialNumber}`);
-        pdfDocument.text(`Meeting Link:${appointment.schedule.meetingLink}`);
-        pdfDocument.moveDown();
 
-        pdfDocument.text(`Amount Paid: ${executedPaymentResult.amount} BDT`);
-        pdfDocument.text(`Payment Method: bkash`);
-        pdfDocument.text(`Transaction Id: ${executedPaymentResult.trxID}`);
-        pdfDocument.text(
-          `Paid At: ${executedPaymentResult.paymentExecuteTime}`,
-        );
+        pdfDocument.y = appointmentDetailsY + 75;
+
+        // Payment Summary Box
+        const paymentBoxY = pdfDocument.y;
+
+        pdfDocument
+          .roundedRect(50, paymentBoxY, 495, 125, 8)
+          .fillColor("#f0fdfa")
+          .fill();
+
+        pdfDocument
+          .roundedRect(50, paymentBoxY, 495, 125, 8)
+          .strokeColor("#99f6e4")
+          .lineWidth(1)
+          .stroke();
+
+        pdfDocument
+          .font("Helvetica-Bold")
+          .fontSize(12)
+          .fillColor("#115e59")
+          .text("PAYMENT SUMMARY", 70, paymentBoxY + 18);
+
+        pdfDocument
+          .font("Helvetica")
+          .fontSize(10)
+          .fillColor("#374151")
+          .text(`Payment Method: bKash`, 70, paymentBoxY + 45)
+          .text(
+            `Transaction ID: ${executedPaymentResult.trxID}`,
+            70,
+            paymentBoxY + 63,
+          )
+          .text(
+            `Paid At: ${executedPaymentResult.paymentExecuteTime}`,
+            70,
+            paymentBoxY + 81,
+          );
+
+        pdfDocument
+          .font("Helvetica-Bold")
+          .fontSize(15)
+          .fillColor("#0f766e")
+          .text(
+            `Amount Paid: ${executedPaymentResult.amount} BDT`,
+            320,
+            paymentBoxY + 52,
+            {
+              width: 205,
+              align: "right",
+            },
+          );
+
+        pdfDocument.y = paymentBoxY + 155;
+
+        // Payment Status
+        pdfDocument
+          .font("Helvetica-Bold")
+          .fontSize(11)
+          .fillColor("#059669")
+          .text("✓ PAYMENT SUCCESSFUL", {
+            align: "center",
+          });
+
+        pdfDocument.moveDown(1);
+
+        // Footer divider
+        pdfDocument
+          .moveTo(50, pdfDocument.y)
+          .lineTo(545, pdfDocument.y)
+          .strokeColor("#e5e7eb")
+          .lineWidth(1)
+          .stroke();
+
+        pdfDocument.moveDown(1);
+
+        // Footer
+        pdfDocument
+          .font("Helvetica")
+          .fontSize(9)
+          .fillColor("#6b7280")
+          .text("Thank you for choosing CareNest.", {
+            align: "center",
+          });
+
+        pdfDocument
+          .fontSize(8)
+          .fillColor("#9ca3af")
+          .text(
+            "This is an automatically generated invoice. Please keep it for your records.",
+            {
+              align: "center",
+            },
+          );
 
         pdfDocument.end();
 
@@ -456,7 +633,7 @@ const bookAppointmentCallback = async (query: Record<string, any>) => {
           "src/app/templates/booking-confirmed.ejs",
         );
         const templateData = {
-          name: name,
+          name: appointment.patient.name,
         };
         const html = await ejs.renderFile(templatePath, templateData);
 

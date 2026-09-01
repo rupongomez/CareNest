@@ -120,7 +120,7 @@ const getSingleDoctorPublicProfile = catchAsync(
     sendResponse(res, {
       statusCode: httpStatus.OK,
       success: true,
-      message: "Doctor Profile Retrieved Successful",
+      message: "Doctor Profile Retrieved Successfully",
       data: result,
     });
   },

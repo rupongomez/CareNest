@@ -7,6 +7,7 @@ import {
   CreateScheduleValidationZodSchema,
   UpdateScheduleValidationZodSchema,
 } from "./schedule.validation";
+
 const router = Router();
 router.post(
   "/create-schedule",

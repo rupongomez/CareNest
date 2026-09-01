@@ -146,7 +146,7 @@ const createPrescription = async (
     "src/app/templates/prescription.ejs",
   );
   const templateData = {
-    name: name,
+    name: appointment.patient.name,
   };
   const html = await ejs.renderFile(templatePath, templateData);
 
