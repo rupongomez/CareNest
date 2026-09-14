@@ -8,8 +8,8 @@ import { AppError } from "../../utils/AppError";
 
 const applyAsDoctor = catchAsync(async (req: Request, res: Response) => {
   const files = req.files as { [fieldname: string]: Express.Multer.File[] };
-  const resume = files?.["resume"] ? files["resume"][0] : null;
   const additionalFiles = files?.["additionalFiles"] || [];
+  const resume = files?.["resume"] ? files["resume"][0] : null;
 
   const zodValidationResult = applyAsDoctorValidationZodSchema.safeParse(
     JSON.parse(req.body.data),

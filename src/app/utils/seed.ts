@@ -17,7 +17,7 @@ export const seedSuperAdmin = async () => {
       return;
     }
     const name = config.super_admin_name;
-    const email = config.super_admin_name;
+    const email = config.super_admin_email;
     const password = config.super_admin_password;
 
     if (!name || !email || !password) {
