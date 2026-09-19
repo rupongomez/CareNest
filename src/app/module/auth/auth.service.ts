@@ -204,6 +204,56 @@ const verifyPatientEmail = async (payload: IVerifyEmailPayload) => {
   };
 };
 
+const resendVerificationOtp = async (email: string) => {
+  const isUserExist = await prisma.user.findUnique({
+    where: { email },
+  });
+
+  if (isUserExist) {
+    throw new AppError(
+      httpStatus.CONFLICT,
+      "User Already exists. Please login to your account.",
+    );
+  }
+
+  const otpKeyInRedis = `patient-registration-otp:${email}`;
+
+  const redisOtp = await redisClient.get(otpKeyInRedis);
+
+  if (redisOtp) {
+    await redisClient.del(redisOtp);
+  }
+
+  const expirationSecond = 5 * 60;
+  const otpKey = `patient-registration-otp:${email}`;
+
+  const otpValue = crypto.randomInt(100000, 1000000).toString();
+  await redisClient.set(otpKey, otpValue, {
+    expiration: {
+      type: "EX",
+      value: expirationSecond,
+    },
+  });
+
+  const templatePath = path.join(
+    process.cwd(),
+    "src/app/templates/resend-user-verification-otp.ejs",
+  );
+
+  const templateData = {
+    email: email,
+    otp: otpValue,
+    expirationMinutes: expirationSecond / 60,
+  };
+  const html = await ejs.renderFile(templatePath, templateData);
+  await transporter.sendMail({
+    from: config.email_sender,
+    to: email,
+    subject: "Verify your email - NestCare",
+    html,
+  });
+};
+
 const loginUser = async (payload: ILoginUserPayload) => {
   const { password } = payload;
   const email = payload.email.trim().toLowerCase();
@@ -605,7 +655,7 @@ const resetPassword = async (payload: IResetPasswordPayload) => {
     process.cwd(),
     "src/app/templates/reset-password-success.ejs",
   );
-  console.log("Template path:", templatePath);
+
   const templateData = {
     name: isUserExist.name,
   };
@@ -629,4 +679,5 @@ export const AuthService = {
   googleLoginIntoDb,
   forgetPassword,
   resetPassword,
+  resendVerificationOtp,
 };

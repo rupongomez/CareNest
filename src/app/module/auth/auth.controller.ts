@@ -49,6 +49,21 @@ const verifyPatientEmail = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const resendVerificationOtp = catchAsync(
+  async (req: Request, res: Response) => {
+    const payload = req.body.email;
+    console.log(payload);
+    await AuthService.resendVerificationOtp(payload);
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Verification OTP resent successfully. Please check your email.",
+      data: null,
+    });
+  },
+);
+
 const loginUser = catchAsync(async (req: Request, res: Response) => {
   const payload = req.body;
   const result = await AuthService.loginUser(payload);
@@ -127,6 +142,7 @@ const refreshToken = catchAsync(async (req: Request, res: Response) => {
     },
   });
 });
+
 const googleLogin = catchAsync(async (req: Request, res: Response) => {
   const payload = req.body;
   const result = await AuthService.googleLoginIntoDb(payload);
@@ -153,6 +169,7 @@ const googleLogin = catchAsync(async (req: Request, res: Response) => {
     data: { accessToken, refreshToken },
   });
 });
+
 const forgotPassword = catchAsync(async (req: Request, res: Response) => {
   const payload = req.body;
   await AuthService.forgetPassword(payload);
@@ -164,6 +181,7 @@ const forgotPassword = catchAsync(async (req: Request, res: Response) => {
     data: {},
   });
 });
+
 const resetPassword = catchAsync(async (req: Request, res: Response) => {
   const payload = req.body;
   await AuthService.resetPassword(payload);
@@ -172,6 +190,18 @@ const resetPassword = catchAsync(async (req: Request, res: Response) => {
     statusCode: httpStatus.OK,
     success: true,
     message: "Password changed successfully",
+    data: null,
+  });
+});
+
+const logout = catchAsync(async (req: Request, res: Response) => {
+  res.clearCookie("accessToken");
+  res.clearCookie("refreshToken");
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "User logged out successfully",
     data: null,
   });
 });
@@ -185,4 +215,6 @@ export const AuthController = {
   googleLogin,
   forgotPassword,
   resetPassword,
+  logout,
+  resendVerificationOtp,
 };

@@ -160,7 +160,7 @@ const applyAsDoctor = async (
 const verifyDoctorEmail = async (payload: IVerifyDoctorEmailPayload) => {
   const otp = payload.otp;
   const email = payload.email;
-  // console.log(email, otp);
+
   const existingUser = await prisma.user.findUnique({
     where: {
       email,
