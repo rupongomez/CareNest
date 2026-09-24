@@ -260,14 +260,30 @@ const approveDoctor = async (
 
   const isApproved = verificationStatus === DoctorVerificationStatus.APPROVED;
 
+  const randomBytes = crypto.randomBytes(8).toString("hex");
+  const password = `CareNest@${randomBytes}${existingDoctor.user.name.split(" ")[0]}`;
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  await prisma.user.update({
+    where: { id: existingDoctor.userId },
+    data: {
+      password: hashedPassword,
+      needPasswordChange: true,
+    },
+  });
+
   const templatePath = path.join(
     process.cwd(),
     `src/app/templates/doctor-application-${isApproved ? "approved" : "rejected"}.ejs`,
   );
 
+  const baseURL = config.frontend_url;
+
   const templateData = {
     name: updatedDoctor.name,
     email: updatedDoctor.email,
+    ...(isApproved && { password }),
+    ...(isApproved && { baseURL }),
   };
 
   const html = await ejs.renderFile(templatePath, templateData);
